@@ -1,74 +1,53 @@
 import "./style.css";
-import puzzleImage from "./puzzlePacks/temple/layout.png";
-import puzzleLayout from "./puzzlePacks/temple/layout.json";
-import adjacents from "./puzzlePacks/temple/adjacent.json";
-import masks from "./puzzlePacks/temple/masks.json";
-import maskToPiecesID from "./puzzlePacks/temple/piece_id_to_mask.json";
+
+import puzzleImage from "./puzzlePacks/evening/layout.png";
+import puzzleLayout from "./puzzlePacks/evening/layout.json";
+import adjacents from "./puzzlePacks/evening/adjacent.json";
+import masks from "./puzzlePacks/evening/masks.json";
+import maskToPiecesID from "./puzzlePacks/evening/piece_id_to_mask.json";
+
+const PUZZLE_NAME = "evening";
 
 const game = {
   puzzle: [],
   connectedPieces: [],
   maxHeight: Math.max(...Object.values(puzzleLayout).map((piece) => piece[3])),
   init() {
-    function createBoundingBox(piece) {
-      const properties = {
-        left: {
-          top: 0,
-          left: 0,
-          width: "60px",
-          height: "100%",
-        },
-        right: {
-          top: 0,
-          right: 0,
-          width: "60px",
-          height: "100%",
-        },
-        top: {
-          top: 0,
-          left: 0,
-          width: "100%",
-          height: "60px",
-        },
-        bottom: {
-          bottom: 0,
-          left: 0,
-          width: "100%",
-          height: "60px",
-        },
-      };
+    if (localStorage.getItem("puzzle")) {
+      const savedPuzzle = JSON.parse(localStorage.getItem("puzzle"));
+      this.connectedPieces = JSON.parse(
+        localStorage.getItem("connectedPieces")
+      );
 
-      for (let side in properties) {
-        const boundingBox = document.createElement("div");
-        boundingBox.classList.add(side);
-        boundingBox.style.position = "absolute";
-        Object.assign(boundingBox.style, properties[side]);
-        piece.appendChild(boundingBox);
+      for (let pcs of Object.entries(puzzleLayout)) {
+        const [key, value] = pcs;
+        const [x, y, w, h] = value;
+
+        const piece = document.createElement("div");
+        piece.id = key;
+
+        const properties = {
+          backgroundImage: `url(${puzzleImage})`,
+          backgroundPosition: `-${x}px -${y}px`,
+          width: `${w}px`,
+          height: `${h}px`,
+          left: `${savedPuzzle[key].x}px`,
+          top: `${savedPuzzle[key].y}px`,
+          position: "absolute",
+          filter: `drop-shadow(0 0 4px rgba(100, 100, 100, 1)`,
+        };
+
+        Object.assign(piece.style, properties);
+        this.createBoundingBox(piece);
+        document
+          .getElementById(
+            savedPuzzle[key].inCanvas ? "canvas" : "pieceSelector"
+          )
+          .appendChild(piece);
+        this.puzzle.push(piece);
       }
-    }
-
-    for (let pcs of Object.entries(puzzleLayout)) {
-      const [key, value] = pcs;
-      const [x, y, w, h] = value;
-
-      const piece = document.createElement("div");
-      piece.id = key;
-
-      const properties = {
-        backgroundImage: `url(${puzzleImage})`,
-        backgroundPosition: `-${x}px -${y}px`,
-        width: `${w}px`,
-        height: `${h}px`,
-        left: `${200 - w / 2}px`,
-        top: `${key * this.maxHeight + 40}px`,
-        position: "absolute",
-        filter: `drop-shadow(0 0 4px rgba(100, 100, 100, 1)`,
-      };
-
-      Object.assign(piece.style, properties);
-      createBoundingBox(piece);
-      document.getElementById("pieceSelector").appendChild(piece);
-      this.puzzle.push(piece);
+    } else {
+      this.newBoard();
     }
 
     for (let piece of this.puzzle) {
@@ -80,21 +59,17 @@ const game = {
               e.clientX -
               document.getElementById("canvas").offsetLeft -
               piece.offsetWidth / 2 +
-              window.scrollX
+              document.getElementById("canvas").scrollLeft
             }px`;
             piece.style.top = `${
               e.clientY -
               document.getElementById("canvas").offsetTop -
               piece.offsetHeight / 2 +
-              window.scrollY
+              document.getElementById("canvas").scrollTop
             }px`;
           } else {
-            piece.style.left = `${
-              e.clientX - piece.offsetWidth / 2 + window.scrollX
-            }px`;
-            piece.style.top = `${
-              e.clientY - piece.offsetHeight / 2 + window.scrollY
-            }px`;
+            piece.style.left = `${e.clientX - piece.offsetWidth / 2}px`;
+            piece.style.top = `${e.clientY - piece.offsetHeight / 2}px`;
           }
 
           for (let connectedPiecesGroup of this.connectedPieces) {
@@ -119,8 +94,19 @@ const game = {
               document.getElementById("pieceSelector").removeChild(piece);
               document.getElementById("canvas").appendChild(piece);
               piece.style.left = `${
-                piece.offsetLeft - document.getElementById("canvas").offsetLeft
+                piece.offsetLeft -
+                document.getElementById("pieceSelector").offsetWidth +
+                document.getElementById("canvas").scrollLeft
               }px`;
+              piece.style.top = `${
+                piece.offsetTop + document.getElementById("canvas").scrollTop
+              }px`;
+
+              document
+                .getElementById("pieceSelector")
+                .childNodes.forEach((piece, key) => {
+                  piece.style.top = `${key * (this.maxHeight + 20)}px`;
+                });
             }
             this.checkCollision(
               this.connectedPieces.find((group) =>
@@ -134,10 +120,14 @@ const game = {
                 document.getElementById("pieceSelector")
               )
             ) {
-              document.getElementById("canvas").removeChild(piece);
-              document.getElementById("pieceSelector").appendChild(piece);
-              piece.style.left = `${200 - piece.offsetWidth / 2}px`;
-              piece.style.top = `${piece.id * this.maxHeight + 40}px`;
+              if (
+                !this.connectedPieces.find((group) => group.includes(piece.id))
+              ) {
+                document.getElementById("canvas").removeChild(piece);
+                document.getElementById("pieceSelector").appendChild(piece);
+                piece.style.left = `${200 - piece.offsetWidth / 2}px`;
+                piece.style.top = `${piece.id * this.maxHeight + 40}px`;
+              }
             } else {
               this.checkCollision(
                 this.connectedPieces.find((group) =>
@@ -169,6 +159,8 @@ const game = {
           this.connectedPieces = this.connectedPieces.map((group) => [
             ...new Set(group),
           ]);
+
+          this.save();
         };
 
         getAllDescendants(document.body).forEach((element) => {
@@ -177,6 +169,12 @@ const game = {
 
         piece.parentNode.style.zIndex = 99;
         piece.style.zIndex = 1000;
+
+        this.connectedPieces
+          .find((group) => group.includes(piece.id))
+          ?.forEach((pieceID) => {
+            document.getElementById(pieceID).style.zIndex = 1000;
+          });
 
         const scrollTop = document.getElementById("pieceSelector").scrollTop;
         document.getElementById("pieceSelector").style.position = "initial";
@@ -198,6 +196,43 @@ const game = {
         }
       }
       return all;
+    }
+  },
+
+  createBoundingBox(piece) {
+    const properties = {
+      left: {
+        top: 0,
+        left: 0,
+        width: "40px",
+        height: "100%",
+      },
+      right: {
+        top: 0,
+        right: 0,
+        width: "40px",
+        height: "100%",
+      },
+      top: {
+        top: 0,
+        left: 0,
+        width: "100%",
+        height: "40px",
+      },
+      bottom: {
+        bottom: 0,
+        left: 0,
+        width: "100%",
+        height: "40px",
+      },
+    };
+
+    for (let side in properties) {
+      const boundingBox = document.createElement("div");
+      boundingBox.classList.add(side);
+      boundingBox.style.position = "absolute";
+      Object.assign(boundingBox.style, properties[side]);
+      piece.appendChild(boundingBox);
     }
   },
 
@@ -368,6 +403,70 @@ const game = {
 
     return false;
   },
+
+  save() {
+    const pieces = Object.fromEntries(
+      this.puzzle.map((piece) => [
+        piece.id,
+        {
+          x: piece.offsetLeft,
+          y: piece.offsetTop,
+          inCanvas: piece.parentNode.id === "canvas",
+        },
+      ])
+    );
+
+    localStorage.setItem("puzzle", JSON.stringify(pieces));
+
+    localStorage.setItem(
+      "connectedPieces",
+      JSON.stringify(this.connectedPieces)
+    );
+
+    localStorage.setItem("puzzleName", PUZZLE_NAME);
+  },
+
+  newBoard() {
+    for (let pcs of Object.entries(puzzleLayout)) {
+      const [key, value] = pcs;
+      const [x, y, w, h] = value;
+
+      const piece = document.createElement("div");
+      piece.id = key;
+
+      const properties = {
+        backgroundImage: `url(${puzzleImage})`,
+        backgroundPosition: `-${x}px -${y}px`,
+        width: `${w}px`,
+        height: `${h}px`,
+        left: `${200 - w / 2}px`,
+        top: `${key * (this.maxHeight + 40)}px`,
+        position: "absolute",
+        filter: `drop-shadow(0 0 4px rgba(100, 100, 100, 1)`,
+      };
+
+      Object.assign(piece.style, properties);
+      this.createBoundingBox(piece);
+      document.getElementById("pieceSelector").appendChild(piece);
+      this.puzzle.push(piece);
+    }
+  },
 };
 
 game.init();
+
+document.getElementById("exportSave").addEventListener("click", () => {
+  // export stuff in localStorage to a file
+  const data = {
+    puzzle: JSON.parse(localStorage.getItem("puzzle")),
+    connectedPieces: JSON.parse(localStorage.getItem("connectedPieces")),
+    puzzleName: localStorage.getItem("puzzleName"),
+  };
+
+  const blob = new Blob([JSON.stringify(data)], { type: "text/plain" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "puzzle.json";
+  a.click();
+});
